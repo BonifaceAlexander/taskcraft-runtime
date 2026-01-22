@@ -7,13 +7,11 @@ from taskcraft.state.persistence import SQLiteStateManager
 from taskcraft.governance.policy import PolicyEngine, ApprovalRequiredPolicy
 from taskcraft.llm.client import GeminiClient
 from taskcraft.tools.definitions import write_file, read_file, deploy_prod
+from taskcraft.observability.logger import configure_logger, get_logger
 
 # Setup logging
-structlog.configure(
-    processors=[structlog.processors.TimeStamper(fmt="iso"), structlog.dev.ConsoleRenderer()],
-    logger_factory=structlog.PrintLoggerFactory(),
-)
-logger = structlog.get_logger()
+configure_logger()
+logger = get_logger()
 
 async def run_cli():
     parser = argparse.ArgumentParser(description="TaskCraft: Gemini Agent Runtime")
