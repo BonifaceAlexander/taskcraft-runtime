@@ -1,0 +1,10 @@
+name: "Ops Analyst"
+description: "A governed coworker that summarizes weekly incidents."
+objective: "Read the incidents for week '2026-W03', summarize the critical issues, and send a report to 'manager@corp.com'."
+
+tools:
+  - module: "examples.incident_tools"
+
+policies:
+  approval_required:
+    - "send_report" # Governance: Human must approve output

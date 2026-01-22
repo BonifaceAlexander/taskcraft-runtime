@@ -3,10 +3,12 @@ import asyncio
 from taskcraft.core.runtime import AgentRuntime
 from taskcraft.core.lifecycle import AgentState
 from taskcraft.state.models import Task
+from taskcraft.executor.local import LocalExecutor
 
 @pytest.mark.asyncio
 async def test_create_task(memory_db, empty_policy_engine):
-    runtime = AgentRuntime(memory_db, empty_policy_engine, tools={})
+    executor = LocalExecutor(tools={})
+    runtime = AgentRuntime(memory_db, empty_policy_engine, executor)
     
     task = await runtime.create_task("Test Objective")
     
@@ -19,7 +21,8 @@ async def test_execute_safe_step(memory_db, empty_policy_engine):
     async def mock_tool(arg: str):
         return f"echo {arg}"
         
-    runtime = AgentRuntime(memory_db, empty_policy_engine, tools={"echo": mock_tool})
+    executor = LocalExecutor(tools={"echo": mock_tool})
+    runtime = AgentRuntime(memory_db, empty_policy_engine, executor)
     task = await runtime.create_task("Test")
     
     # Manually trigger a step

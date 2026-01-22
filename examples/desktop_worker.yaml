@@ -1,0 +1,12 @@
+name: "Desktop Assistant"
+description: "A local agent that helps organize your computer."
+objective: "Scan my 'Downloads' folder for files larger than 100MB and list them in a file called 'large_files_report.txt' on my Desktop."
+
+# Uses standard filesystem tools
+tools:
+  - module: "taskcraft.tools.fs_skills"
+
+policies:
+  # Desktop tasks usually need less strict governance, 
+  # but we still protect system directories.
+  max_actions: 50

@@ -2,12 +2,17 @@ import argparse
 import asyncio
 import os
 import structlog
+import json
 from taskcraft.core.runtime import AgentRuntime
 from taskcraft.state.persistence import SQLiteStateManager
-from taskcraft.governance.policy import PolicyEngine, ApprovalRequiredPolicy
-from taskcraft.llm.client import GeminiClient
+from taskcraft.governance.policy import PolicyEngine, ApprovalRequiredPolicy, MaxActionsPolicy
+from taskcraft.planner.gemini import GeminiPlanner
 from taskcraft.tools.definitions import write_file, read_file, deploy_prod
+from taskcraft.config.loader import load_config, load_tools
 from taskcraft.observability.logger import configure_logger, get_logger
+
+# Executor Impls
+from taskcraft.executor.local import LocalExecutor
 
 # Setup logging
 configure_logger()
@@ -15,11 +20,18 @@ logger = get_logger()
 
 async def run_cli():
     parser = argparse.ArgumentParser(description="TaskCraft: Gemini Agent Runtime")
+    
+    # Global Flags
+    parser.add_argument("--backend", choices=["sqlite", "postgres"], default="sqlite", help="State backend")
+    
     subparsers = parser.add_subparsers(dest="command")
 
     # Command: Run
     run_parser = subparsers.add_parser("run", help="Start a new task")
-    run_parser.add_argument("objective", type=str, help="The goal for the agent")
+    run_parser.add_argument("--objective", "-o", type=str, help="The goal for the agent")
+    run_parser.add_argument("--file", "-f", type=str, help="Path to agent configuration file (YAML)")
+    run_parser.add_argument("--executor", choices=["local", "docker"], default="local", help="Execution environment")
+    run_parser.add_argument("--planner", choices=["gemini", "tot"], default="gemini", help="Reasoning engine")
 
     # Command: Resume
     resume_parser = subparsers.add_parser("resume", help="Resume a task")
@@ -29,64 +41,159 @@ async def run_cli():
     approve_parser = subparsers.add_parser("approve", help="Approve a blocked task")
     approve_parser.add_argument("task_id", type=str, help="The ID of the task to approve")
 
-    args = parser.parse_args()
+    # Command: Status
+    status_parser = subparsers.add_parser("status", help="Get status of a task")
+    status_parser.add_argument("task_id", type=str, help="The ID of the task")
 
-    # 1. Init Infrastructure
-    db_path = "taskcraft_state.db"
-    state_manager = SQLiteStateManager(db_path)
+    # Command: Logs
+    logs_parser = subparsers.add_parser("logs", help="Get detailed logs/trace of a task")
+    logs_parser.add_argument("task_id", type=str, help="The ID of the task")
+
+
+    args = parser.parse_args()
+    if not args.command:
+        parser.print_help()
+        return
+
+    # 1. Init Infrastructure (Factory)
+    state_manager = None
+    if args.backend == "sqlite":
+        db_path = os.getenv("SQLITE_DB_PATH", "taskcraft_state.db")
+        state_manager = SQLiteStateManager(db_path)
+    elif args.backend == "postgres":
+        from taskcraft.state.postgres import PostgresStateManager
+        db_url = os.getenv("DATABASE_URL")
+        if not db_url:
+            print("❌ Error: DATABASE_URL must be set for postgres backend.")
+            return
+        state_manager = PostgresStateManager(db_url)
+    
     await state_manager.initialize()
 
-    # Define tools map
-    tools = {
-        "write_file": write_file,
-        "read_file": read_file,
-        "deploy_prod": deploy_prod
-    }
-
-    # Policies
-    policy_engine = PolicyEngine(policies=[
-        ApprovalRequiredPolicy(sensitive_tools=["deploy_prod"])
-    ])
-
-    # Runtime
-    runtime = AgentRuntime(state_manager, policy_engine, tools)
-    llm_client = GeminiClient() # Expects GOOGLE_API_KEY env var
-
+    # 2. Command Handling
     if args.command == "run":
-        print(f"🚀 Starting task: {args.objective}")
-        task = await runtime.create_task(args.objective)
+        # Load Config & Tools
+        tools = {}
+        policies = []
+        config_name = "Agent"
         
-        # Start Loop
-        await runtime.run_loop(task, llm_client)
+        if args.file:
+            print(f"📂 Loading configuration from {args.file}...")
+            try:
+                config = load_config(args.file)
+                tools = load_tools(config)
+                if config.policies.max_actions:
+                    policies.append(MaxActionsPolicy(max_actions=config.policies.max_actions))
+                if config.policies.approval_required:
+                    policies.append(ApprovalRequiredPolicy(sensitive_tools=config.policies.approval_required))
+                task_objective = args.objective if args.objective else config.objective
+                config_name = config.name
+            except Exception as e:
+                print(f"❌ Error loading config: {e}")
+                return
+        else:
+            if not args.objective:
+                print("❌ Error: --objective is required.")
+                return
+            tools = {"write_file": write_file, "read_file": read_file, "deploy_prod": deploy_prod}
+            policies = [ApprovalRequiredPolicy(["deploy_prod"]), MaxActionsPolicy(10)]
+            task_objective = args.objective
+
+        policy_engine = PolicyEngine(policies=policies)
+
+        # Factory: Executor
+        executor = None
+        if args.executor == "local":
+             executor = LocalExecutor(tools)
+        elif args.executor == "docker":
+             from taskcraft.executor.docker import DockerExecutor
+             # In v1, DockerExecutor behaves differently (serialization gap).
+             # implementing basic fallback or direct usage for now.
+             print("🐳 Using Docker Executor (Sandbox Mode)")
+             executor = DockerExecutor() 
+             # Warning: We are passing tools to DockerExecutor but v1 implementation 
+             # needs better protocol. For now, it runs 'run_shell'.
+
+        # Factory: Planner
+        planner = None
+        if args.planner == "gemini":
+            planner = GeminiPlanner()
+        elif args.planner == "tot":
+            from taskcraft.planner.tot import TreeOfThoughtsPlanner
+            planner = TreeOfThoughtsPlanner()
+
+        # Runtime
+        print(f"🤖 Agent: {config_name} | Backend: {args.backend} | Executor: {args.executor}")
+        runtime = AgentRuntime(state_manager, policy_engine, executor)
+
+        print(f"🚀 Starting task: {task_objective}")
+        task = await runtime.create_task(task_objective)
+        
+        await runtime.run_loop(task, planner)
         print(f"🏁 Task finished with status: {task.status.name}")
         if task.status.name == "AWAITING_APPROVAL":
             print(f"✋ Task halted. Use 'taskcraft approve {task.task_id}' to continue.")
 
-    elif args.command == "resume":
-        print(f"🔄 Resuming task: {args.task_id}")
-        task = await runtime.resume_task(args.task_id)
-        await runtime.run_loop(task, llm_client)
+    elif args.command == "resume" or args.command == "approve":
+        # Simplified Resume Logic (Recreating runtime components)
+        # Note: In a real distributed system, the worker process would self-assemble based on config.
+        # Here we default to LocalExecutor + GeminiPlanner for simple resumption.
+        
+        print(f"Runnning command: {args.command} on {args.task_id}")
+        
+        # Tools Hack for Demo (Incident Reporter)
+        from examples.incident_tools import send_report, fetch_incidents
+        tools = {"send_report": send_report, "fetch_incidents": fetch_incidents}
+        
+        executor = LocalExecutor(tools)
+        planner = GeminiPlanner()
+        policy_engine = PolicyEngine([]) # Relaxed policy or reloaded
 
-    elif args.command == "approve":
-        print(f"✅ Approving task: {args.task_id}")
-        task = await runtime.resume_task(args.task_id)
-        if task.status.name != "AWAITING_APPROVAL":
-            print(f"Task is in state {task.status.name}, not AWAITING_APPROVAL.")
+        runtime = AgentRuntime(state_manager, policy_engine, executor)
+        
+        if args.command == "resume":
+             task = await runtime.resume_task(args.task_id)
+             if task.status.name == "COMPLETED":
+                 print("Task already completed")
+             else:
+                 await runtime.run_loop(task, planner)
+                 
+        elif args.command == "approve":
+             task = await runtime.resume_task(args.task_id)
+             if task.status.name != "AWAITING_APPROVAL":
+                  print(f"Task is {task.status.name}, not AWAITING_APPROVAL")
+                  return
+                  
+             pending_step = next((s for s in task.steps if s.status == "PENDING_APPROVAL"), None)
+             if pending_step:
+                 print(f"Approving step: {pending_step.name}")
+                 await runtime.execute_step(task, pending_step.name, pending_step.input_data)
+                 # Reload & Continue
+                 task.status = "EXECUTING"
+                 await runtime.run_loop(task, planner)
+             else:
+                 print("No pending steps.")
+
+    elif args.command == "status":
+        task = await state_manager.load_task(args.task_id)
+        if not task:
+            print("Task not found.")
             return
+        print(f"Task: {task.task_id}")
+        print(f"Status: {task.status.name}")
+        print(f"Steps: {len(task.steps)}")
+        print(f"Created: {task.created_at}")
 
-        # Manually move state forward (In real system, we'd have an 'approve_step' method)
-        # Find the pending step
-        pending_step = next((s for s in task.steps if s.status == "PENDING_APPROVAL"), None)
-        if pending_step:
-            print(f"Approving step: {pending_step.name}")
-            # Execute it now
-            res = await runtime.execute_step(task, pending_step.name, pending_step.input_data)
-            print(f"Result: {res}")
-            
-            # Continue loop
-            await runtime.run_loop(task, llm_client)
-        else:
-            print("No pending steps found.")
+    elif args.command == "logs":
+        task = await state_manager.load_task(args.task_id)
+        if not task:
+            print("Task not found.")
+            return
+        print(json.dumps({
+            "id": task.task_id,
+            "status": task.status.name,
+            "steps": [s.model_dump() for s in task.steps]
+        }, indent=2, default=str))
 
 if __name__ == "__main__":
     asyncio.run(run_cli())

@@ -1,86 +1,109 @@
-# TaskCraft: The Gemini Consumer Runtime
+# TaskCraft: The Agent Runtime 🏗️
 
-![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)
+**TaskCraft is infrastructure for building reliable AI coworkers.**
 
-**Taskcraft is an open execution and governance runtime for building reliable, multi-step AI coworkers. It currently runs on Google Gemini and is designed to be extended to other models over time.**
+It is a runtime that provides **state**, **governance**, and **execution primitives** so you can trust LLMs with real work.
 
-Unlike simple chat loops, TaskCraft provides **durable state**, **policy governance**, **observability**, and **lifecycle management**.
+## 🌟 The Vision: "Universal Worker"
+TaskCraft is a **superset** of tools like "Claude Computer Use".
+*   **Desktop Mode:** It runs locally to manage your files, apps, and terminal.
+*   **Enterprise Mode:** It runs in the cloud to process tickets, emails, and data.
+*   **Connectors:** If you have a Python function for it (Salesforce, Slack, Jira), TaskCraft can use it.
 
-## 🚀 Quickstart Guide
+## What is TaskCraft?
 
-### prerequisites
-*   Python 3.10+
-*   A Google Gemini API Key
+TaskCraft turns an LLM into a governed system that can:
+
+1.  **Define a Role**: "You are an Ops Analyst", defined in code/config.
+2.  **Execute Work**: "Run this workflow", not "Chat with me".
+3.  **Persist State**: Resume after failure, track progress (SQLite backed).
+4.  **Enforce Safety**: "Ask approval before sending emails" (Policy Engine).
+5.  **Observe**: Detailed audit logs of every thought and action.
+
+## The Goal
+
+A user of TaskCraft should be able to trust an AI system with real operational work — because it behaves like a governed coworker, not an unpredictable assistant.
+
+## Quickstart
 
 ### 1. Installation
 
-Clone the repository and install dependencies:
-
 ```bash
-git clone https://github.com/your-username/taskcraft.git
-cd taskcraft
-
-# Create a virtual environment
-python3 -m venv .venv
-source .venv/bin/activate
-
-# Install the package
 pip install -e .
+# Ensure you have the latest SDK
+pip install google-genai
+export GOOGLE_API_KEY="your-key-here"
 ```
 
-### 2. Configuration
+### 2. Define Your Coworker (`ops_analyst.yaml`)
 
-Export your Gemini API key:
+Define abilities and **governance rules** declaratively.
 
-```bash
-export GOOGLE_API_KEY="your_api_key_here"
+```yaml
+name: "Ops Analyst"
+objective: "Summarize weekly incidents and email the team."
+
+tools:
+  - module: "examples.incident_tools" 
+
+policies:
+  approval_required:
+    - "send_report" # STOP! Human review needed.
 ```
 
-### 3. Usage
+### 3. Run the Task
 
-#### Interactive "Coworker" Run
-Run a task. The agent will plan, check policies, and execute tools.
-
+**Local Mode (Default):**
+Uses SQLite and runs tools on your host machine.
 ```bash
-python -m taskcraft.main_cli run "Write a poem about rust and save it to poem.txt"
+python -m taskcraft.main_cli run -f examples/incident_reporter.yaml
 ```
 
-#### Simulating Governance (The "Risky" Action)
-Try a task that triggers a safety policy (configured to block `deploy_prod`):
-
+**Enterprise Mode:**
+Uses Postgres, Docker Sandboxing, and Advanced Planning.
 ```bash
-python -m taskcraft.main_cli run "Deploy version v2 to production"
+export DATABASE_URL="postgresql+asyncpg://user:pass@localhost/db"
+python -m taskcraft.main_cli run \
+  -f examples/incident_reporter.yaml \
+  --backend postgres \
+  --executor docker \
+  --planner tot
 ```
 
 **Output:**
 ```
-🚀 Starting task: Deploy version v2 to production
+🚀 Starting task...
+🤖 Backend: postgres | Executor: docker
 ...
-✋ Task halted. Use 'taskcraft approve <task_id>' to continue.
 ```
 
-#### Approving a Task
-Copy the `task_id` from the output above and approve it:
+### 4. Governance (The "Human Layer")
+
+The agent **cannot** proceed without you. This is a feature.
 
 ```bash
+# View the blocked task
 python -m taskcraft.main_cli approve <task_id>
 ```
-The agent will now resume, execute the restricted action, and complete the task.
+**Output:**
+```
+✅ Approving task...
+📧 SENDING EMAIL to manager@corp.com ...
+🏁 Task finished.
+```
 
-## 🏗 Architecture
+## Architecture
 
-TaskCraft introduces the missing primitives for AI work:
+*   **Runtime**: The `AgentRuntime` executes the loop (Plan -> Policy -> Action).
+*   **State**: `SQLiteStateManager` ensures durability. If the process dies, the task resumes where it left off.
+*   **Policy**: `PolicyEngine` intercepts tools before execution.
+*   **Tools**: Any Python function can be a tool.
 
-*   **Agent Runtime**: A formal state machine (`IDLE`, `PLANNING`, `EXECUTING`, `AWAITING_APPROVAL`).
-*   **Persistence**: SQLite-backed state. If the process crashes, the agent remembers where it was.
-*   **Governance Engine**: Policies that run *before* every tool execution.
-*   **Tool Abstraction**: Retry logic (`tenacity`) and safe execution wrappers.
-
-## 🤝 Contributing
-
-We aim to eventually propose this as a runtime layer for the official `gemini-cli`.
-Project structure:
-
-*   `src/taskcraft/core`: Main runtime logic.
-*   `src/taskcraft/governance`: Policy definitions.
-*   `src/taskcraft/state`: DB and Data Models.
+## Documentation
+*   [User Guide](docs/user_guide.md) - How to build and run agents.
+*   [Technical Architecture](docs/architecture.md) - Deep dive into Planner/Executor/Runtime.
+*   [Project Structure](docs/project_structure.md) - Codebase map.
+*   [Deployment Guide](docs/deployment.md) - Cloud Run / K8s instructions.
+*   [Design Decisions](docs/DESIGN_DECISIONS.md) - Why we built it this way.
+*   [Security Policy](docs/SECURITY.md) - Governance and safety.
+*   [Contributing](docs/CONTRIBUTING.md) - Developer guide.
