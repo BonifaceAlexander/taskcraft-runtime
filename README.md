@@ -10,9 +10,15 @@ TaskCraft is a **superset** of tools like "Claude Computer Use".
 *   **Enterprise Mode:** It runs in the cloud to process tickets, emails, and data.
 *   **Connectors:** If you have a Python function for it (Salesforce, Slack, Jira), TaskCraft can use it.
 
-## What is TaskCraft?
+## What is TaskCraft? 🏗️
 
-TaskCraft turns an LLM into a governed system that can:
+### What It Is NOT
+*   ❌ **Not a Chatbot:** It is not designed for conversational chit-chat.
+*   ❌ **Not an Agent Framework:** It is not a library of prompts like LangChain.
+*   ❌ **Not a UI:** It has no frontend; it is headless infrastructure.
+
+### What It IS
+TaskCraft is a **Universal Worker Runtime**. It turns any LLM into a governed system that can:
 
 1.  **Define a Role**: "You are an Ops Analyst", defined in code/config.
 2.  **Execute Work**: "Run this workflow", not "Chat with me".

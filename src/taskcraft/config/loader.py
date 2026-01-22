@@ -42,10 +42,10 @@ def load_tools(config: AgentConfig) -> Dict[str, Callable]:
                 mod = importlib.import_module(tool_cfg.module)
                 # Find all async functions in module
                 for name, obj in inspect.getmembers(mod):
-                    if inspect.isfunction(obj) or inspect.iscoroutinefunction(obj):
-                        # Filter? For now, load everything that looks like a tool
-                        # In real app, check for @tool decorator
-                         tools[name] = obj
+                    if (inspect.isfunction(obj) or inspect.iscoroutinefunction(obj)):
+                         # Filter: Only load functions defined IN this module, not imports
+                         if obj.__module__ == mod.__name__:
+                             tools[name] = obj
             except ImportError as e:
                 print(f"Warning: Could not import module {tool_cfg.module}: {e}")
 

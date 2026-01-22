@@ -1,0 +1,13 @@
+[10:00:01] 🚀 Starting task: Read incidents for week '2026-W03'...
+[10:00:03] 🤖 Agent decides: Call fetch_incidents('2026-W03')
+[10:00:03] ⚙️ Executing: fetch_incidents
+[10:00:04] 🤖 Agent decides: Call send_report(...)
+[10:00:04] 🛡️ POLICY INTERCEPT: Approval Required for 'send_report'
+[10:00:04] ✋ Task halted. ID: 12345-abcde. Status: AWAITING_APPROVAL
+
+--- User runs 'approve' ---
+
+[10:05:00] 📂 Loading task 12345-abcde
+[10:05:00] ✅ Approving pending step...
+[10:05:01] 📧 SENDING EMAIL to manager@corp.com 📧
+[10:05:01] 🏁 Task finished with status: COMPLETED
