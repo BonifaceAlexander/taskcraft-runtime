@@ -52,6 +52,6 @@ async def test_failure_recovery_resume(memory_db, empty_policy_engine):
     # The mock uses side_effect, so next call succeeds
     result = await runtime_2.execute_step(resumed_task, "flaky_tool", {})
     
-    assert result == "Success!"
+    assert result["output"] == "Success!"
     # Verify mock was called twice
     assert mock_tool.call_count == 2
