@@ -12,23 +12,32 @@ TaskCraft is a **superset** of tools like "Claude Computer Use".
 
 ## What is TaskCraft? 🏗️
 
-### What It Is NOT
-*   ❌ **Not a Chatbot:** It is not designed for conversational chit-chat.
-*   ❌ **Not an Agent Framework:** It is not a library of prompts like LangChain.
-*   ❌ **Not a UI:** It has no frontend; it is headless infrastructure.
+TaskCraft is a **Universal Worker Runtime**.
 
-### What It IS
-TaskCraft is a **Universal Worker Runtime**. It turns any LLM into a governed system that can:
+*   It is **NOT** a chatbot, an agent framework (like LangChain), or a UI.
+*   It **IS** the infrastructure layer that turns an LLM into a reliable "Employee".
 
-1.  **Define a Role**: "You are an Ops Analyst", defined in code/config.
-2.  **Execute Work**: "Run this workflow", not "Chat with me".
-3.  **Persist State**: Resume after failure, track progress (SQLite backed).
-4.  **Enforce Safety**: "Ask approval before sending emails" (Policy Engine).
-5.  **Observe**: Detailed audit logs of every thought and action.
+Think of it like this:
+*   🧠 **Gemini is the Brain.**
+*   🦾 **TaskCraft is the Body** (Hands to do work, Ears to listen to policy, Memory to resume after sleep).
 
-## The Goal
+### Key Features 🌟
 
-A user of TaskCraft should be able to trust an AI system with real operational work — because it behaves like a governed coworker, not an unpredictable assistant.
+#### 1. Strict Governance (The "Boss" Layer) 🛡️
+*   **Policy Interception**: Before the AI runs *any* tool (like `delete_file` or `send_email`), TaskCraft checks the rules.
+*   **Human Approval**: If a tool is dangerous, the task **halts** and waits for you to say "Approved" via the CLI.
+
+#### 2. True Persistence (The "Crash Proof" Layer) 💾
+*   **Resume-ability**: If your computer crashes or the script dies mid-task, TaskCraft saves the state in a local database (SQLite). You can run `resume <task_id>` and it picks up exactly where it left off.
+*   **Audit Logs**: Every "thought" and "action" is recorded forever.
+
+#### 3. Universal Execution (The "Hands" Layer) 🛠️
+*   **Computer Use**: It can take screenshots and use desktop tools.
+*   **Sandboxing**: It can securely run untrusted Python code inside Docker containers (Enterprise Mode).
+*   **Tool Agnostic**: Connect any Python function (Jira, Slack, Salesforce) and the agent can use it.
+
+#### 4. Model Neutrality (The "Brain" Adapter) 🧠
+While optimized for **Gemini v2**, the architecture is "Strategic Pattern" based. You can swap the brain for Claude, GPT-4, or even a hardcoded script (`DummyPlanner`) without changing the rest of the system.
 
 ## Quickstart
 

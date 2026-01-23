@@ -6,6 +6,13 @@ from datetime import datetime
 class AgentState(Enum):
     """
     Represents the high-level state of the agent in the runtime.
+    
+    Transitions:
+    IDLE -> PLANNING
+    PLANNING -> EXECUTING
+    EXECUTING -> PLANNING (Loop) | AWAITING_APPROVAL | COMPLETED | FAILED
+    AWAITING_APPROVAL -> EXECUTING (Approved) | FAILED (Rejected)
+    FAILED -> PLANNING (Retry) | TERMINATED (Give up)
     """
     IDLE = auto()               # Initial state, waiting for task
     PLANNING = auto()           # Breaking down the user request

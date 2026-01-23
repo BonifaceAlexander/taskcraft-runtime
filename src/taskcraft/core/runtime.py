@@ -84,11 +84,11 @@ class AgentRuntime:
             
         await self.state_manager.save_task(task)
 
-    async def execute_step(self, task: Task, action: str, params: dict) -> Dict[str, Any]:
+    async def execute_step(self, task: Task, action: str, params: dict, bypass_policy: bool = False) -> Dict[str, Any]:
         """Exposed for Manual Approval / CLI to run a specific step."""
-        return await self._execute_governed_step(task, action, params)
+        return await self._execute_governed_step(task, action, params, bypass_policy=bypass_policy)
 
-    async def _execute_governed_step(self, task: Task, action: str, params: dict) -> Dict[str, Any]:
+    async def _execute_governed_step(self, task: Task, action: str, params: dict, bypass_policy: bool = False) -> Dict[str, Any]:
         """Internal method to handle policy + execution."""
         # Update State
         step = Step(task_id=task.task_id, index=task.current_step_index, name=action, input_data=params)
@@ -96,8 +96,11 @@ class AgentRuntime:
         task.current_step_index += 1
         
         # Check Governance
-        context = {'action_count': len(task.steps)}
-        decision = self.policy_engine.evaluate(action, params, context)
+        if bypass_policy:
+            decision = type('Decision', (), {'allowed': True, 'requires_approval': False})() # Mock allowed decision
+        else:
+            context = {'action_count': len(task.steps)}
+            decision = self.policy_engine.evaluate(action, params, context)
         
         if not decision.allowed:
             if decision.requires_approval:

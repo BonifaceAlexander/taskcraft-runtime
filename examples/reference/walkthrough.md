@@ -56,5 +56,26 @@ python -m taskcraft.main_cli approve <task_id>
 🏁 Task finished with status: COMPLETED
 ```
 
-## 4. Why this matters
+## 4. Simulating Failure & Recovery
+TaskCraft is built to survive crashes. Try this:
+
+1.  **Start the Task**:
+    ```bash
+    python -m taskcraft.main_cli run -f examples/reference/incident_reporter.yaml
+    ```
+2.  **Kill It Mid-Flight**:
+    Press `Ctrl+C` immediately after it starts executing.
+
+3.  **Resume**:
+    Find the `Task ID` from the logs (e.g., `12345-abcde`) and resume it:
+    ```bash
+    python -m taskcraft.main_cli resume 12345-abcde
+    ```
+
+**What happens:**
+*   TaskCraft loads the state from `taskcraft_state.db`.
+*   It sees the last completed step.
+*   It **skips** already completed steps and resumes exactly where it died.
+
+## 5. Why this matters
 This creates a **collaborative loop**. The AI does the heavy lifting (fetching, reasoning, summarizing), but the human retains final authority over high-stakes actions (emailing, deploying, deleting).

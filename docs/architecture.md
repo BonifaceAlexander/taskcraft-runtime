@@ -28,7 +28,32 @@ The heart of the system. It runs the **ReAct Loop**:
 4.  **Act**: Execute the tool.
 5.  **Reflect**: Store the result and repeat.
 
-### 2. State Manager (`state/persistence.py`)
+### 2. Agent Lifecycle
+The agent moves through a strict state machine:
+
+```mermaid
+stateDiagram-v2
+    [*] --> IDLE
+    IDLE --> PLANNING: Task Created
+    PLANNING --> EXECUTING: Plan Generated
+    
+    state EXECUTING {
+        [*] --> ToolCall
+        ToolCall --> PolicyCheck
+        PolicyCheck --> RunTool: Allowed
+        PolicyCheck --> AWAITING_APPROVAL: Approval Needed
+        RunTool --> ToolCall: Continue
+    }
+
+    EXECUTING --> PLANNING: Re-Plan
+    EXECUTING --> COMPLETED: Goal Met
+    EXECUTING --> FAILED: Error/Max Steps
+    
+    AWAITING_APPROVAL --> EXECUTING: User Approves
+    AWAITING_APPROVAL --> FAILED: User Rejects
+```
+
+### 3. State Manager (`state/persistence.py`)
 *   Uses **SQLite** (`aiosqlite`) for durable storage.
 *   Stores `Tasks`, `Steps`, and `Artifacts`.
 *   Allows pausing/resuming agents (process-restartable).

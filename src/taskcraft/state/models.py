@@ -22,7 +22,7 @@ class Step(BaseModel):
     end_time: Optional[datetime] = None
 
 class Task(BaseModel):
-    """Represents a high-level user request or workflow."""
+    """Represents a high-level user request or task."""
     task_id: str = Field(default_factory=generate_id)
     description: str
     status: AgentState = AgentState.IDLE
