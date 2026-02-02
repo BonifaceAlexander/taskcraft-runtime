@@ -39,6 +39,12 @@ Think of it like this:
 #### 4. Model Neutrality (The "Brain" Adapter) 🧠
 While optimized for **Gemini v2**, the architecture is "Strategic Pattern" based. You can swap the brain for Claude, GPT-4, or even a hardcoded script (`DummyPlanner`) without changing the rest of the system.
 
+## Community discussion
+
+Related upstream discussion on execution runtimes for agent workflows:
+https://github.com/google-gemini/gemini-cli/discussions/17379
+
+
 ## Quickstart
 
 ### 1. Installation
